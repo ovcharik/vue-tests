@@ -1,30 +1,44 @@
 <script setup lang="ts">
+import { computed, ref } from "@vue/reactivity";
 import { fetchServers, useServersStore } from "./stores/servers-store";
-import { onMounted } from "vue";
-import { computed } from "@vue/reactivity";
+
+const matchSubstring = (source: string, substr: string) =>
+  source.toLowerCase().includes(substr.toLowerCase());
+
+const filterSubstring = ref<string>("AE");
 
 const serversStore = useServersStore();
-const servers = computed(() => serversStore.selectAll());
-const isLoading = computed(() => serversStore.selectIsLoading());
-const isError = computed(() => serversStore.selectIsError());
+const servers = computed(() =>
+  serversStore.selectAll((server) =>
+    matchSubstring(server.name, filterSubstring.value)
+  )
+);
 
-const reload = () => {
+const load = () => {
   serversStore.clearEntities();
   fetchServers();
 };
 
-const error = () => {
+const loadWithError = () => {
   serversStore.clearEntities();
   fetchServers(true);
-}
+};
 </script>
 
 <template>
-  <button @click="reload">Load servers</button>
-  <button @click="error">Loading error</button>
+  <div>
+    <button @click="load">Load servers</button>
+    <button @click="loadWithError">Loading error</button>
+  </div>
 
-  <div v-if="isLoading">LOADING ...</div>
-  <div v-if="isError" style="color: red;">LOADING ERROR</div>
+  <div>
+    <input v-model="filterSubstring" placeholder="Filter" />
+  </div>
+
+  <div v-if="serversStore.selectIsLoading()">LOADING ...</div>
+  <div v-if="serversStore.selectRequestError()" style="color: red">
+    LOADING ERROR
+  </div>
 
   <div v-for="server of servers">
     {{ server.name }}

@@ -6,9 +6,10 @@ interface DefineEntityStoreOptions<T> {
 
 type RequestStatus = "idle" | "pending" | "success" | "error";
 
-type State<T, ID> = {
+type State<T, ID extends PropertyKey> = {
   ids: ID[];
   entities: T[];
+  entitiesById: Record<ID, T>;
   requestStatus: RequestStatus;
 };
 
@@ -26,36 +27,50 @@ export const defineEntityStore = <T>(
     state: (): State<T, ID> => ({
       ids: [],
       entities: [],
+      entitiesById: {},
       requestStatus: "idle",
     }),
 
     getters: {
       selectAll(state) {
-        return () => state.entities;
+        return (filter?: (entity: T) => boolean) => {
+          const entities = state.entities as T[];
+          return filter ? entities.filter(filter) : state.entities;
+        };
       },
 
       selectById(state) {
-        return (id: ID) => state.entities.find((x) => selectId(x as T) === id);
+        return (id: ID) => state.entitiesById[id];
       },
 
       selectIsLoading(state) {
-        return () => state.requestStatus === 'pending';
+        return () => state.requestStatus === "pending";
       },
 
-      selectIsError(state) {
-        return () => state.requestStatus === 'error';
+      selectRequestError(state) {
+        return () => state.requestStatus === "error";
       },
     },
 
     actions: {
       setEntities(entities: T[]) {
-        this.entities = entities as any;
-        this.ids = entities.map((x) => selectId(x));
+        const entitiesById = Object.fromEntries(
+          entities.map((x) => [selectId(x), x])
+        );
+
+        this.$patch({
+          ids: entities.map((x) => selectId(x)),
+          entities,
+          entitiesById,
+        });
       },
 
       clearEntities() {
-        this.entities = [];
-        this.ids = [];
+        this.$patch({
+          ids: [],
+          entities: [],
+          entitiesById: {},
+        });
       },
 
       setRequestStatus(status: RequestStatus) {
@@ -65,7 +80,7 @@ export const defineEntityStore = <T>(
   });
 };
 
-export const requestEntities = <T>(
+export const loadStoreEntities = <T>(
   entityStore: EntityStore<T>,
   request: Promise<T[]>
 ) => {

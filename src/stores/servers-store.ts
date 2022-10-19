@@ -1,4 +1,4 @@
-import { defineEntityStore, requestEntities } from "./entity-store";
+import { defineEntityStore, loadStoreEntities } from "./entity-store";
 
 export interface Server {
   uuid: string;
@@ -10,17 +10,17 @@ export const useServersStore = defineEntityStore<Server>("servers", {
 });
 
 export const fetchServers = (withError = false) => {
+  const errorPromise = () =>
+    new Promise<Server[]>((resolve, reject) => {
+      setTimeout(reject.bind(null, new Error("loading error")), 1000);
+    });
+
+  const loadPromise = () =>
+    fetch("https://api.selectel.ru/servers/v2/pub/service/server")
+      .then((response) => response.json())
+      .then((json: { result: Server[] }) => json.result);
+
   const store = useServersStore();
-
-  const errorPromise = new Promise<Server[]>((resolve, reject) => {
-    setTimeout(reject, 1000);
-  })
-
-  const request = withError
-    ? errorPromise
-    : fetch("https://api.selectel.ru/servers/v2/pub/service/server")
-        .then((response) => response.json())
-        .then((json: { result: Server[] }) => json.result);
-
-  return requestEntities(store, request);
+  const request = withError ? errorPromise() : loadPromise();
+  return loadStoreEntities(store, request);
 };
